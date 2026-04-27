@@ -14,7 +14,6 @@ pygame.display.set_caption('Platformer')
 
 tile_size = 50
 
-
 sun_img = pygame.image.load('sun.png')
 bg_img = pygame.transform.scale(pygame.image.load('sky.png'), (screen_width, screen_height))
 
@@ -35,8 +34,8 @@ class Player():
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
-        self.width = self.image.get_width
-        self.height = self.image.get_height
+        self.width = 40
+        self.height = 80
         self.vel_y = 0
         self.jumped = False
         self.direction = 0
@@ -48,15 +47,14 @@ class Player():
 
         key = pygame.key.get_pressed()
         if key[pygame.K_SPACE] and self.jumped == False:
-            self.vel_y = -17.1
+            self.vel_y = -16
             self.jumped = True
-        # Removed: if key[pygame.K_SPACE] == False: self.jumped = False
         if key[pygame.K_a]:
-            dx -= 5
+            dx -= 6
             self.counter += 1
             self.direction = -1
         if key[pygame.K_d]:
-            dx += 5
+            dx += 6
             self.counter += 1
             self.direction = 1
         if key[pygame.K_a] == False and key[pygame.K_d] == False:
@@ -81,138 +79,28 @@ class Player():
 
 
         self.vel_y += 1
-        if self.vel_y > 18:
-            self.vel_y = 24
-        dy += self.v+= dx
-        self.rect.y += dy
+        if self.vel_y > 10:
+            self.vel_y = 10
+        dy += self.vel_y
 
-        if self.rect.bottom > screen_height:
-            self.rect.bottom = screen_height
-            self.jumped = False # Reset jumped if player hits bottom of screen
-        dy = 0
-
-        screen.blit(self.image, self.rect)
-        pygame.draw.rect(screen, (255, 255, 255), self.rect, 2)
-
-
-class World():
-    def __init__ (self, data):
-        self.tile_list = []
-
-
-        #load images
-        dirt_image = pygame.image.load('dirt.png')
-        grass_img = pygame.image.load('grass.png')
-        grassleft_img = pygame.image.load('grassleft.png')
-        grassright_img = pygame.image.load('grassright.png')
-        row_count = 0
-        for row in data:
-            col_count = 0
-            for tile in row:
-                if tile == 1:
-                    img =  pygame.transform.scale(dirt_image, (tile_size, tile_size))
-                    img_rect = img.get_rect()
-                    img_rect.x = col_count * tile_size
-                    img_rect.y = row_count * tile_size # Corrected this line
-                    tile = (img, img_rect)
-                    self.tile_list.append(tile)
-                if tile == 2:
-                    img =  pygame.transform.scale(grass_img, (tile_size, tile_size)) # Corrected variable name from grass_image to grass_img
-                    img_rect = img.get_rect()
-                    img_rect.x = col_count * tile_size
-                    img_rect.y = row_count * tile_size # Corrected this line
-                    tile = (img, img_rect)
-                    self.tile_list.append(tile)
-                if tile == 3:
-                    img =  pygame.transform.scale(grassleft_img, (tile_size, tile_size)) # Corrected variable name from grass_image to grass_img
-                    img_rect = img.get_rect()
-                    img_rect.x = col_count * tile_size
-                    img_rect.y = row_count * tile_size # Corrected this line
-                    tile = (img, img_rect)
-                    self.tile_list.append(tile)
-                if tile == 4:
-                    img =  pygame.transform.scale(grassright_img, (tile_size, tile_size)) # Corrected variable name from grass_image to grass_img
-                    img_rect = img.get_rect()
-                    img_rect.x = col_count * tile_size
-                    img_rect.y = row_count * tile_size # Corrected this line
-                    tile = (img, img_rect)
-                    self.tile_list.append(tile)
-                col_count += 1
-                # col_count += 1 # Removed duplicate increment of col_count
-            row_count += 1
-
-    def draw(self):
-        for tile in self.tile_list:
-            screen.blit(tile[0], tile[1])
-            pygame.draw.rect(screen, (255, 255, 255), tile[1], 2)
-
-world_data = [
-[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
-[1, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 7, 0, 0, 0, 0, 1],
-[1, 2, 4, 0, 0, 7, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 1, 1, 2, 2, 2, 4, 0, 0, 0, 0, 0, 0, 3, 4, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2, 2, 2, 2, 2, 4, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 7, 0, 0, 0, 0, 3, 2, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 3, 2, 2, 2, 2, 1],
-[1, 0, 0, 0, 0, 0, 3, 2, 4, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
-[1, 0, 0, 0, 0, 3, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
-[1, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
-]
-
-player = Player(100, screen_height - 130)
-world = World(world_data)
-
-
-run = True
-while run:
-
-    clock.tick(fps)
-
-    screen.blit(bg_img, (0, 0))
-    screen.blit(sun_img, (100, 100))
-
-    world.draw()
-
-    player.update()
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            run = False
-
-    pygame.display.update()
-
-pygame.quit()el_y
-
-        for title in world.tile_list:
-            if title[1].colliderect(pygame.Rect(self.rect.x + dx, self.rect.y, self.rect.width, self.rect.height)):
+        for tile in world.tile_list:
+            if tile[1].colliderect(pygame.Rect(self.rect.x + dx, self.rect.y, self.width, self.height)):
                 dx = 0
 
-            #check for collicion in y direction
-            if title[1].colliderect(pygame.Rect(self.rect.x, self.rect.y + dy, self.rect.width, self.rect.height)):
+            if tile[1].colliderect(pygame.Rect(self.rect.x, self.rect.y + dy, self.width, self.height)):
                 if self.vel_y < 0:
-                    dy = title[1].bottom - self.rect.top
+                    dy = tile[1].bottom - self.rect.top
                     self.vel_y = 0
                 elif self.vel_y >= 1:
-                    dy = title[1].top - self.rect.bottom
-                    self.jumped = False # Reset jumped when player lands
+                    dy = tile[1].top - self.rect.bottom
+                    self.jumped = False
 
         self.rect.x += dx
         self.rect.y += dy
 
         if self.rect.bottom > screen_height:
             self.rect.bottom = screen_height
-            self.jumped = False # Reset jumped if player hits bottom of screen
-        dy = 0
+            self.jumped = False
 
         screen.blit(self.image, self.rect)
         pygame.draw.rect(screen, (255, 255, 255), self.rect, 2)
@@ -222,8 +110,6 @@ class World():
     def __init__ (self, data):
         self.tile_list = []
 
-
-        #load images
         dirt_image = pygame.image.load('dirt.png')
         grass_img = pygame.image.load('grass.png')
         grassleft_img = pygame.image.load('grassleft.png')
@@ -236,38 +122,39 @@ class World():
                     img =  pygame.transform.scale(dirt_image, (tile_size, tile_size))
                     img_rect = img.get_rect()
                     img_rect.x = col_count * tile_size
-                    img_rect.y = row_count * tile_size # Corrected this line
-                    tile = (img, img_rect)
-                    self.tile_list.append(tile)
+                    img_rect.y = row_count * tile_size
+                    self.tile_list.append((img, img_rect))
                 if tile == 2:
-                    img =  pygame.transform.scale(grass_img, (tile_size, tile_size)) # Corrected variable name from grass_image to grass_img
+                    img =  pygame.transform.scale(grass_img, (tile_size, tile_size))
                     img_rect = img.get_rect()
                     img_rect.x = col_count * tile_size
-                    img_rect.y = row_count * tile_size # Corrected this line
-                    tile = (img, img_rect)
-                    self.tile_list.append(tile)
+                    img_rect.y = row_count * tile_size
+                    self.tile_list.append((img, img_rect))
                 if tile == 3:
-                    img =  pygame.transform.scale(grassleft_img, (tile_size, tile_size)) # Corrected variable name from grass_image to grass_img
+                    img =  pygame.transform.scale(grassleft_img, (tile_size, tile_size))
                     img_rect = img.get_rect()
                     img_rect.x = col_count * tile_size
-                    img_rect.y = row_count * tile_size # Corrected this line
-                    tile = (img, img_rect)
-                    self.tile_list.append(tile)
+                    img_rect.y = row_count * tile_size
+                    self.tile_list.append((img, img_rect))
                 if tile == 4:
-                    img =  pygame.transform.scale(grassright_img, (tile_size, tile_size)) # Corrected variable name from grass_image to grass_img
+                    img =  pygame.transform.scale(grassright_img, (tile_size, tile_size))
                     img_rect = img.get_rect()
                     img_rect.x = col_count * tile_size
-                    img_rect.y = row_count * tile_size # Corrected this line
-                    tile = (img, img_rect)
-                    self.tile_list.append(tile)
+                    img_rect.y = row_count * tile_size
+                    self.tile_list.append((img, img_rect))
                 col_count += 1
-                # col_count += 1 # Removed duplicate increment of col_count
             row_count += 1
 
     def draw(self):
         for tile in self.tile_list:
             screen.blit(tile[0], tile[1])
             pygame.draw.rect(screen, (255, 255, 255), tile[1], 2)
+
+
+class Enemye(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self)
+
 
 world_data = [
 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -283,8 +170,8 @@ world_data = [
 [1, 1, 1, 2, 2, 2, 4, 0, 0, 0, 0, 0, 0, 3, 4, 0, 0, 0, 0, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2, 2, 2, 2, 2, 4, 0, 0, 0, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 7, 0, 0, 0, 0, 3, 2, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 7, 0, 0, 0, 0, 0, 3, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 3, 2, 2, 2, 2, 1],
 [1, 0, 0, 0, 0, 0, 3, 2, 4, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
