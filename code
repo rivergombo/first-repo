@@ -13,6 +13,7 @@ screen = pygame.display.set_mode((screen_width, screen_height))
 pygame.display.set_caption('Platformer')
 
 tile_size = 50
+game_over = 0
 
 sun_img = pygame.image.load('sun.png')
 bg_img = pygame.transform.scale(pygame.image.load('sky.png'), (screen_width, screen_height))
@@ -43,7 +44,7 @@ class Player():
     def update(self):
         dx = 0
         dy = 0
-        walk_cooldown = 5
+        walk_cooldown = 4
 
         key = pygame.key.get_pressed()
         if key[pygame.K_SPACE] and self.jumped == False:
@@ -77,6 +78,12 @@ class Player():
             if self.direction == -1:
                 self.image = self.images_left[self.index]
 
+        #check for collision for enemyes
+        if pygame.sprite.spritecollide(self, goomba_group, False):
+            game_over = -1
+        if pygame.sprite.spritecollide(self, lava_group, False):
+            game_over = -1
+            
 
         self.vel_y += 1
         if self.vel_y > 10:
@@ -143,8 +150,11 @@ class World():
                     img_rect.y = row_count * tile_size
                     self.tile_list.append((img, img_rect))
                 if tile == 5:
-                    goomba = Enemy(col_count * tile_size, row_count * tile_size)
+                    goomba = Enemy(col_count * tile_size, row_count * tile_size + 15)
                     goomba_group.add(goomba)
+                if tile == 6:
+                    lava = Lava(col_count * tile_size, row_count * tile_size + (tile_size // 2))
+                    lava_group.add(lava)
                 col_count += 1
             row_count += 1
 
@@ -161,26 +171,44 @@ class Enemy(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
+        self.move_direction = 2
+        self.move_counter = 0
+        
+    def update(self):
+        self.rect.x += self.move_direction
+        self.move_counter += 2
+        if abs(self.move_counter) > 50:
+            self.move_direction *= -1
+            self.move_counter *= -1
 
+class Lava(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self)
+        img = pygame.image.load('lava.png')
+        self.image = pygame.transform.scale(img, (tile_size, tile_size // 2))
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+    
 
 world_data = [
 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
 [1, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 3, 2, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 3, 2, 2, 4, 0, 0, 0, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 3, 2, 2, 2, 2, 2, 4, 0, 0, 0, 0, 0, 0, 0, 0, 1],
 [1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 7, 0, 0, 0, 0, 1],
 [1, 2, 4, 0, 0, 7, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 1, 1, 2, 2, 2, 4, 0, 0, 0, 0, 0, 0, 3, 4, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 4, 0, 0, 0, 1],
+[1, 1, 1, 2, 2, 2, 4, 0, 0, 0, 0, 5, 0, 0, 5, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2, 2, 2, 2, 2, 4, 0, 0, 0, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 7, 0, 0, 0, 0, 2, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 7, 0, 0, 0, 0, 3, 2, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 3, 2, 2, 2, 2, 1],
-[1, 0, 0, 0, 0, 0, 3, 2, 4, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1],
+[1, 0, 0, 0, 0, 0, 3, 2, 2, 6, 6, 6, 6, 6, 1, 1, 1, 1, 1, 1],
 [1, 0, 0, 0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 [1, 0, 0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 [1, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -189,7 +217,7 @@ world_data = [
 player = Player(100, screen_height - 130)
 
 goomba_group = pygame.sprite.Group()
-
+lava_group = pygame.sprite.Group()
 world = World(world_data)
 
 
@@ -202,7 +230,10 @@ while run:
     screen.blit(sun_img, (100, 100))
 
     world.draw()
+    goomba_group.update()
     goomba_group.draw(screen)
+    lava_group.draw(screen)
+    
     player.update()
 
     for event in pygame.event.get():
