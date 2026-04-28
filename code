@@ -17,8 +17,22 @@ game_over = 0
 
 sun_img = pygame.image.load('sun.png')
 bg_img = pygame.transform.scale(pygame.image.load('sky.png'), (screen_width, screen_height))
+restart_img = pygame.image.load('restart_btn.png')
 
 
+
+class Button():
+    def __init__(self, x, y, image):
+        self.image = image
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+
+    def draw(self):
+
+        screen.blit(self.image, self.rect)
+
+        
 class Player():
     def __init__(self, x, y):
         self.images_right = []
@@ -240,8 +254,10 @@ player = Player(100, screen_height - 130)
 
 goomba_group = pygame.sprite.Group()
 lava_group = pygame.sprite.Group()
+
 world = World(world_data)
 
+restart_button = Button(screen_width // 2 - 50, screen_height // 2 + 100, restart_img)
 
 run = True
 while run:
