@@ -27,8 +27,19 @@ class Button():
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
+        self.clicked = False
 
     def draw(self):
+        
+        pos = pygame.mouse.get_pos()
+
+        if self.rect.collidepoint(pos):
+            if pygame.mouse.get_pressed()[0] == 1 and self.clicked == False:
+                print('hello')
+                self.clicked = True
+                
+        if pygame.mouse.get_pressed()[0] == 0:
+            self.clicked = False
 
         screen.blit(self.image, self.rect)
 
@@ -126,7 +137,7 @@ class Player():
 
         elif game_over == -1:
             self.image = self.dead_image
-            self.rect.y += 5
+            self.rect.y += 8
             
 
         screen.blit(self.image, self.rect)
@@ -276,6 +287,10 @@ while run:
     lava_group.draw(screen)
     
     game_over = player.update(game_over)
+
+    #if player has died
+    if game_over == -1:
+        restart_button.draw()
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
