@@ -30,20 +30,20 @@ class Button():
         self.clicked = False
 
     def draw(self):
-        
+
         pos = pygame.mouse.get_pos()
 
         if self.rect.collidepoint(pos):
             if pygame.mouse.get_pressed()[0] == 1 and self.clicked == False:
                 print('hello')
                 self.clicked = True
-                
+
         if pygame.mouse.get_pressed()[0] == 0:
             self.clicked = False
 
         screen.blit(self.image, self.rect)
 
-        
+
 class Player():
     def __init__(self, x, y):
         self.images_right = []
@@ -75,7 +75,7 @@ class Player():
         key = pygame.key.get_pressed()
         if game_over == 0:
 
-            
+
             if key[pygame.K_SPACE] and self.jumped == False:
                 self.vel_y = -16
                 self.jumped = True
@@ -138,7 +138,7 @@ class Player():
         elif game_over == -1:
             self.image = self.dead_image
             self.rect.y += 8
-            
+
 
         screen.blit(self.image, self.rect)
         pygame.draw.rect(screen, (255, 255, 255), self.rect, 2)
@@ -214,12 +214,19 @@ class World():
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, x, y):
         pygame.sprite.Sprite.__init__(self)
-        self.image = pygame.image.load('goomba.png')
+        self.images = []
+        for num in range(4):
+            img = pygame.image.load(f'goomba{num}.png') if num > 0 else pygame.image.load('goomba.png')
+            self.images.append(img)
+        self.index = 0
+        self.image = self.images[self.index]
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
         self.move_direction = 2
         self.move_counter = 0
+        self.animation_counter = 0
+        self.animation_cooldown = 10 # Adjust for animation speed
 
     def update(self):
         self.rect.x += self.move_direction
@@ -227,6 +234,15 @@ class Enemy(pygame.sprite.Sprite):
         if abs(self.move_counter) > 50:
             self.move_direction *= -1
             self.move_counter *= -1
+
+        # Handle animation
+        self.animation_counter += 1
+        if self.animation_counter > self.animation_cooldown:
+            self.animation_counter = 0
+            self.index += 1
+            if self.index >= len(self.images):
+                self.index = 0
+            self.image = self.images[self.index]
 
 class Lava(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -282,10 +298,10 @@ while run:
 
     if game_over == 0:
         goomba_group.update()
-        
+
     goomba_group.draw(screen)
     lava_group.draw(screen)
-    
+
     game_over = player.update(game_over)
 
     #if player has died
