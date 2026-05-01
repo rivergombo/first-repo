@@ -19,8 +19,6 @@ sun_img = pygame.image.load('sun.png')
 bg_img = pygame.transform.scale(pygame.image.load('sky.png'), (screen_width, screen_height))
 restart_img = pygame.image.load('restart_btn.png')
 
-
-
 class Button():
     def __init__(self, x, y, image):
         self.image = image
@@ -30,22 +28,82 @@ class Button():
         self.clicked = False
 
     def draw(self):
-
+        action = False
         pos = pygame.mouse.get_pos()
-
         if self.rect.collidepoint(pos):
             if pygame.mouse.get_pressed()[0] == 1 and self.clicked == False:
-                print('hello')
+                action = True
                 self.clicked = True
-
         if pygame.mouse.get_pressed()[0] == 0:
             self.clicked = False
-
         screen.blit(self.image, self.rect)
-
+        return action
 
 class Player():
     def __init__(self, x, y):
+        self.reset(x, y)
+
+    def update(self, game_over):
+        dx = 0
+        dy = 0
+        walk_cooldown = 4
+        key = pygame.key.get_pressed()
+        if game_over == 0:
+            if key[pygame.K_SPACE] and self.jumped == False:
+                self.vel_y = -16
+                self.jumped = True
+            if key[pygame.K_a]:
+                dx -= 6
+                self.counter += 1
+                self.direction = -1
+            if key[pygame.K_d]:
+                dx += 6
+                self.counter += 1
+                self.direction = 1
+            if key[pygame.K_a] == False and key[pygame.K_d] == False:
+                self.counter = 0
+                self.index = 0
+                if self.direction == 1:
+                    self.image = self.images_right[self.index]
+                if self.direction == -1:
+                    self.image = self.images_left[self.index]
+            if self.counter > walk_cooldown:
+                self.counter = 0
+                self.index += 1
+                if self.index >= len(self.images_right):
+                    self.index = 0
+                if self.direction == 1:
+                    self.image = self.images_right[self.index]
+                if self.direction == -1:
+                    self.image = self.images_left[self.index]
+            if pygame.sprite.spritecollide(self, goomba_group, False):
+                game_over = -1
+            if pygame.sprite.spritecollide(self, lava_group, False):
+                game_over = -1
+            self.vel_y += 1
+            if self.vel_y > 10:
+                self.vel_y = 10
+            dy += self.vel_y
+            for tile in world.tile_list:
+                if tile[1].colliderect(pygame.Rect(self.rect.x + dx, self.rect.y, self.width, self.height)):
+                    dx = 0
+                if tile[1].colliderect(pygame.Rect(self.rect.x, self.rect.y + dy, self.width, self.height)):
+                    if self.vel_y < 0:
+                        dy = tile[1].bottom - self.rect.top
+                        self.vel_y = 0
+                    elif self.vel_y >= 1:
+                        dy = tile[1].top - self.rect.bottom
+                        self.jumped = False
+            self.rect.x += dx
+            self.rect.y += dy
+        elif game_over == -1:
+            self.image = self.dead_image
+            self.rect.y += 8
+        screen.blit(self.image, self.rect)
+        pygame.draw.rect(screen, (255, 255, 255), self.rect, 2)
+        return game_over
+
+    def reset(self, x, y):
         self.images_right = []
         self.images_left = []
         self.index = 0
@@ -67,89 +125,9 @@ class Player():
         self.jumped = False
         self.direction = 0
 
-    def update(self, game_over):
-        dx = 0
-        dy = 0
-        walk_cooldown = 4
-
-        key = pygame.key.get_pressed()
-        if game_over == 0:
-
-
-            if key[pygame.K_SPACE] and self.jumped == False:
-                self.vel_y = -16
-                self.jumped = True
-            if key[pygame.K_a]:
-                dx -= 6
-                self.counter += 1
-                self.direction = -1
-            if key[pygame.K_d]:
-                dx += 6
-                self.counter += 1
-                self.direction = 1
-            if key[pygame.K_a] == False and key[pygame.K_d] == False:
-                self.counter = 0
-                self.index = 0
-                if self.direction == 1:
-                    self.image = self.images_right[self.index]
-                if self.direction == -1:
-                    self.image = self.images_left[self.index]
-
-
-
-            if self.counter > walk_cooldown:
-                self.counter = 0
-                self.index += 1
-                if self.index >= len(self.images_right):
-                    self.index = 0
-                if self.direction == 1:
-                    self.image = self.images_right[self.index]
-                if self.direction == -1:
-                    self.image = self.images_left[self.index]
-
-            #check for collision for lava
-            if pygame.sprite.spritecollide(self, goomba_group, False):
-                game_over = -1
-            if pygame.sprite.spritecollide(self, lava_group, False):
-                game_over = -1
-
-
-            self.vel_y += 1
-            if self.vel_y > 10:
-                self.vel_y = 10
-            dy += self.vel_y
-
-            for tile in world.tile_list:
-                if tile[1].colliderect(pygame.Rect(self.rect.x + dx, self.rect.y, self.width, self.height)):
-                    dx = 0
-
-                if tile[1].colliderect(pygame.Rect(self.rect.x, self.rect.y + dy, self.width, self.height)):
-                    if self.vel_y < 0:
-                        dy = tile[1].bottom - self.rect.top
-                        self.vel_y = 0
-                    elif self.vel_y >= 1:
-                        dy = tile[1].top - self.rect.bottom
-                        self.jumped = False
-
-            self.rect.x += dx
-            self.rect.y += dy
-
-
-        elif game_over == -1:
-            self.image = self.dead_image
-            self.rect.y += 8
-
-
-        screen.blit(self.image, self.rect)
-        pygame.draw.rect(screen, (255, 255, 255), self.rect, 2)
-
-        return game_over
-
-
 class World():
     def __init__ (self, data):
         self.tile_list = []
-
         dirt_image = pygame.image.load('dirt.png')
         grass_img = pygame.image.load('grass.png')
         grassleft_img = pygame.image.load('grassleft.png')
@@ -161,25 +139,25 @@ class World():
             col_count = 0
             for tile in row:
                 if tile == 1:
-                    img =  pygame.transform.scale(dirt_image, (tile_size, tile_size))
+                    img = pygame.transform.scale(dirt_image, (tile_size, tile_size))
                     img_rect = img.get_rect()
                     img_rect.x = col_count * tile_size
                     img_rect.y = row_count * tile_size
                     self.tile_list.append((img, img_rect))
                 if tile == 2:
-                    img =  pygame.transform.scale(grass_img, (tile_size, tile_size))
+                    img = pygame.transform.scale(grass_img, (tile_size, tile_size))
                     img_rect = img.get_rect()
                     img_rect.x = col_count * tile_size
                     img_rect.y = row_count * tile_size
                     self.tile_list.append((img, img_rect))
                 if tile == 3:
-                    img =  pygame.transform.scale(grassleft_img, (tile_size, tile_size))
+                    img = pygame.transform.scale(grassleft_img, (tile_size, tile_size))
                     img_rect = img.get_rect()
                     img_rect.x = col_count * tile_size
                     img_rect.y = row_count * tile_size
                     self.tile_list.append((img, img_rect))
                 if tile == 4:
-                    img =  pygame.transform.scale(grassright_img, (tile_size, tile_size))
+                    img = pygame.transform.scale(grassright_img, (tile_size, tile_size))
                     img_rect = img.get_rect()
                     img_rect.x = col_count * tile_size
                     img_rect.y = row_count * tile_size
@@ -191,13 +169,13 @@ class World():
                     lava = Lava(col_count * tile_size, row_count * tile_size + (tile_size // 2))
                     lava_group.add(lava)
                 if tile == 7:
-                    img =  pygame.transform.scale(brick_img, (tile_size, tile_size))
+                    img = pygame.transform.scale(brick_img, (tile_size, tile_size))
                     img_rect = img.get_rect()
                     img_rect.x = col_count * tile_size
                     img_rect.y = row_count * tile_size
                     self.tile_list.append((img, img_rect))
                 if tile == 8:
-                    img =  pygame.transform.scale(hitbrick_img, (tile_size, tile_size))
+                    img = pygame.transform.scale(hitbrick_img, (tile_size, tile_size))
                     img_rect = img.get_rect()
                     img_rect.x = col_count * tile_size
                     img_rect.y = row_count * tile_size
@@ -209,7 +187,6 @@ class World():
         for tile in self.tile_list:
             screen.blit(tile[0], tile[1])
             pygame.draw.rect(screen, (255, 255, 255), tile[1], 2)
-
 
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -223,19 +200,38 @@ class Enemy(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.x = x
         self.rect.y = y
-        self.move_direction = 2
-        self.move_counter = 0
+        self.move_speed = 2
         self.animation_counter = 0
-        self.animation_cooldown = 10 # Adjust for animation speed
+        self.animation_cooldown = 5
+        self.vel_y = 0
 
-    def update(self):
-        self.rect.x += self.move_direction
-        self.move_counter += 2
-        if abs(self.move_counter) > 50:
-            self.move_direction *= -1
-            self.move_counter *= -1
-
-        # Handle animation
+    def update(self, world, player_rect):
+        dx = 0
+        dy = 0
+        if player_rect.x < self.rect.x:
+            dx = -self.move_speed
+        elif player_rect.x > self.rect.x:
+            dx = self.move_speed
+        self.vel_y += 1
+        if self.vel_y > 10:
+            self.vel_y = 10
+        dy += self.vel_y
+        for tile in world.tile_list:
+            temp_rect_x = self.rect.copy()
+            temp_rect_x.x += dx
+            if tile[1].colliderect(temp_rect_x):
+                dx = 0
+            temp_rect_y = self.rect.copy()
+            temp_rect_y.y += dy
+            if tile[1].colliderect(temp_rect_y):
+                if self.vel_y < 0:
+                    dy = tile[1].bottom - self.rect.top
+                    self.vel_y = 0
+                elif self.vel_y >= 0:
+                    dy = tile[1].top - self.rect.bottom
+                    self.vel_y = 0
+        self.rect.x += dx
+        self.rect.y += dy
         self.animation_counter += 1
         if self.animation_counter > self.animation_cooldown:
             self.animation_counter = 0
@@ -253,24 +249,23 @@ class Lava(pygame.sprite.Sprite):
         self.rect.x = x
         self.rect.y = y
 
-
 world_data = [
 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 7, 7, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
 [1, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 1],
 [1, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
 [1, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 7, 7, 7, 7, 7, 7, 0, 5, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 8, 7, 0, 3, 2, 2, 2, 2, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 8, 7, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2, 2, 2, 2, 1],
 [1, 0, 0, 0, 0, 0, 3, 2, 2, 6, 6, 6, 6, 6, 1, 1, 1, 1, 1, 1],
 [1, 0, 0, 0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 [1, 0, 0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -278,40 +273,29 @@ world_data = [
 ]
 
 player = Player(100, screen_height - 130)
-
 goomba_group = pygame.sprite.Group()
 lava_group = pygame.sprite.Group()
-
 world = World(world_data)
-
 restart_button = Button(screen_width // 2 - 50, screen_height // 2 + 100, restart_img)
 
 run = True
 while run:
-
     clock.tick(fps)
-
     screen.blit(bg_img, (0, 0))
     screen.blit(sun_img, (100, 100))
-
     world.draw()
-
     if game_over == 0:
-        goomba_group.update()
-
+        goomba_group.update(world, player.rect)
     goomba_group.draw(screen)
     lava_group.draw(screen)
-
     game_over = player.update(game_over)
-
-    #if player has died
     if game_over == -1:
-        restart_button.draw()
-
+        if restart_button.draw():
+            player.reset(100, screen_height - 130)
+            game_over = 0
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
-
     pygame.display.update()
 
 pygame.quit()
