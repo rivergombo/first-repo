@@ -1,5 +1,7 @@
 import pygame
 from pygame.locals import *
+import pickle
+from os import path
 
 pygame.init()
 
@@ -14,10 +16,38 @@ pygame.display.set_caption('Platformer')
 
 tile_size = 50
 game_over = 0
+main_menu = True
+level = 0
+max_levels = 7
 
 sun_img = pygame.image.load('sun.png')
 bg_img = pygame.transform.scale(pygame.image.load('sky.png'), (screen_width, screen_height))
 restart_img = pygame.image.load('restart_btn.png')
+start_img = pygame.image.load('start_btn.png')
+exit_img = pygame.image.load('exit_btn.png')
+
+#reset to level
+def reset_level(level_to_load):
+    player.reset(100, screen_height - 130)
+    goomba_group.empty()
+    lava_group.empty()
+    exit_group.empty()
+
+    # Initialize world_data to an empty list to prevent UnboundLocalError
+    world_data_for_level = []
+
+    # Use the passed parameter 'level_to_load' instead of global 'level'
+    if path.exists(f'level{level_to_load}_data'):
+        with open(f'level{level_to_load}_data', 'rb') as pickle_in:
+            world_data_for_level = pickle.load(pickle_in)
+    else:
+        # If the level data file is not found, an empty world will be created.
+        # This might be why the user observes no change.
+        print(f"Warning: Level data file 'level{level_to_load}_data' not found. Creating an empty world.")
+
+    world = World(world_data_for_level)
+
+    return world
 
 class Button():
     def __init__(self, x, y, image):
@@ -49,9 +79,14 @@ class Player():
         walk_cooldown = 4
         key = pygame.key.get_pressed()
         if game_over == 0:
-            if key[pygame.K_SPACE] and self.jumped == False:
-                self.vel_y = -16
-                self.jumped = True
+            # Double jump logic
+            if key[pygame.K_SPACE] and self.pressed_jump == False and self.jump_count < 2:
+                self.vel_y = -18
+                self.jump_count += 1
+                self.pressed_jump = True
+            if key[pygame.K_SPACE] == False:
+                self.pressed_jump = False
+
             if key[pygame.K_a]:
                 dx -= 6
                 self.counter += 1
@@ -76,31 +111,73 @@ class Player():
                     self.image = self.images_right[self.index]
                 if self.direction == -1:
                     self.image = self.images_left[self.index]
-            if pygame.sprite.spritecollide(self, goomba_group, False):
-                game_over = -1
-            if pygame.sprite.spritecollide(self, lava_group, False):
-                game_over = -1
+
             self.vel_y += 1
             if self.vel_y > 10:
                 self.vel_y = 10
             dy += self.vel_y
-            for tile in world.tile_list:
-                if tile[1].colliderect(pygame.Rect(self.rect.x + dx, self.rect.y, self.width, self.height)):
-                    dx = 0
-                if tile[1].colliderect(pygame.Rect(self.rect.x, self.rect.y + dy, self.width, self.height)):
-                    if self.vel_y < 0:
-                        dy = tile[1].bottom - self.rect.top
-                        self.vel_y = 0
-                    elif self.vel_y >= 1:
-                        dy = tile[1].top - self.rect.bottom
-                        self.jumped = False
-            self.rect.x += dx
-            self.rect.y += dy
+
+            # Check for goomba collisions
+            temp_player_rect = self.rect.copy()
+            temp_player_rect.x += dx
+            temp_player_rect.y += dy
+
+            player_collided_with_goomba = False
+            player_landed_on_goomba_head = False
+
+            for goomba in goomba_group:
+                if goomba.alive:
+                    if temp_player_rect.colliderect(goomba.rect):
+                        # Prioritize the head-stomp: falling and feet above the goomba's mid-section
+                        if self.vel_y > 0 and self.rect.bottom < goomba.rect.centery:
+                            self.vel_y = -10 # Bounce
+                            goomba.alive = False
+                            player_landed_on_goomba_head = True
+                        else:
+                            player_collided_with_goomba = True
+
+            # If we landed on a head, we override any side-collisions with bunched up enemies for this frame
+            if player_landed_on_goomba_head:
+                player_collided_with_goomba = False
+
+            if player_collided_with_goomba:
+                game_over = -1
+
+            if game_over != -1:
+                if pygame.sprite.spritecollide(self, lava_group, False):
+                    game_over = -1
+
+                if pygame.sprite.spritecollide(self, exit_group, False):
+                    game_over = 1
+
+
+                for tile in world.tile_list:
+                    if tile[1].colliderect(pygame.Rect(self.rect.x + dx, self.rect.y, self.width, self.height)):
+                        dx = 0
+                    if tile[1].colliderect(pygame.Rect(self.rect.x, self.rect.y + dy, self.width, self.height)):
+                        if self.vel_y < 0:
+                            dy = tile[1].bottom - self.rect.top
+                            self.vel_y = 0
+                        elif self.vel_y >= 0: # Changed from >= 1 to >= 0 to catch landing
+                            dy = tile[1].top - self.rect.bottom
+                            self.vel_y = 0
+                            self.jump_count = 0 # Reset jump count when landing
+                            self.pressed_jump = False # Reset pressed_jump when landing
+
+                self.rect.x += dx
+                self.rect.y += dy
+
+            # Apply jump animation if jumping
+            if self.jump_count > 0 and self.vel_y != 0:
+                if self.direction == 1:
+                    self.image = self.jump_image_right
+                else:
+                    self.image = self.jump_image_left
+
         elif game_over == -1:
             self.image = self.dead_image
             self.rect.y += 8
         screen.blit(self.image, self.rect)
-        pygame.draw.rect(screen, (255, 255, 255), self.rect, 2)
         return game_over
 
     def reset(self, x, y):
@@ -109,12 +186,18 @@ class Player():
         self.index = 0
         self.counter = 0
         for num in range(1, 5):
-            img_right = pygame.image.load(f'guy{num}.png')
+            img_right = pygame.image.load(f'mario{num}.png')
             img_right = pygame.transform.scale(img_right, (40, 80))
             img_left = pygame.transform.flip(img_right, True, False)
             self.images_right.append(img_right)
             self.images_left.append(img_left)
         self.dead_image = pygame.image.load('mariodead.png')
+
+        # Load jump images
+        jump_img = pygame.image.load('mariojump.png')
+        self.jump_image_right = pygame.transform.scale(jump_img, (40, 80))
+        self.jump_image_left = pygame.transform.flip(self.jump_image_right, True, False)
+
         self.image = self.images_right[self.index]
         self.rect = self.image.get_rect()
         self.rect.x = x
@@ -122,7 +205,8 @@ class Player():
         self.width = 40
         self.height = 80
         self.vel_y = 0
-        self.jumped = False
+        self.jump_count = 0  # Initialize jump counter
+        self.pressed_jump = False # Tracks if jump key is currently held down
         self.direction = 0
 
 class World():
@@ -150,36 +234,39 @@ class World():
                     img_rect.x = col_count * tile_size
                     img_rect.y = row_count * tile_size
                     self.tile_list.append((img, img_rect))
-                if tile == 3:
+                if tile == 12:
                     img = pygame.transform.scale(grassleft_img, (tile_size, tile_size))
                     img_rect = img.get_rect()
                     img_rect.x = col_count * tile_size
                     img_rect.y = row_count * tile_size
                     self.tile_list.append((img, img_rect))
-                if tile == 4:
+                if tile == 14:
                     img = pygame.transform.scale(grassright_img, (tile_size, tile_size))
                     img_rect = img.get_rect()
                     img_rect.x = col_count * tile_size
                     img_rect.y = row_count * tile_size
                     self.tile_list.append((img, img_rect))
-                if tile == 5:
+                if tile == 11:
                     goomba = Enemy(col_count * tile_size, row_count * tile_size + 15)
                     goomba_group.add(goomba)
                 if tile == 6:
                     lava = Lava(col_count * tile_size, row_count * tile_size + (tile_size // 2))
                     lava_group.add(lava)
-                if tile == 7:
+                if tile == 9:
                     img = pygame.transform.scale(brick_img, (tile_size, tile_size))
                     img_rect = img.get_rect()
                     img_rect.x = col_count * tile_size
                     img_rect.y = row_count * tile_size
                     self.tile_list.append((img, img_rect))
-                if tile == 8:
+                if tile == 10:
                     img = pygame.transform.scale(hitbrick_img, (tile_size, tile_size))
                     img_rect = img.get_rect()
                     img_rect.x = col_count * tile_size
                     img_rect.y = row_count * tile_size
                     self.tile_list.append((img, img_rect))
+                if tile == 8:
+                    exit = Exit(col_count * tile_size, row_count * tile_size - (tile_size // 2))
+                    exit_group.add(exit)
                 col_count += 1
             row_count += 1
 
@@ -204,41 +291,65 @@ class Enemy(pygame.sprite.Sprite):
         self.animation_counter = 0
         self.animation_cooldown = 5
         self.vel_y = 0
+        self.direction = 1
+        self.alive = True
+        self.dead_image = pygame.image.load('goombadie.png')
+        self.dead_animation_counter = 0
+        self.dead_animation_duration = fps // 2
 
     def update(self, world, player_rect):
-        dx = 0
-        dy = 0
-        if player_rect.x < self.rect.x:
-            dx = -self.move_speed
-        elif player_rect.x > self.rect.x:
-            dx = self.move_speed
-        self.vel_y += 1
-        if self.vel_y > 10:
-            self.vel_y = 10
-        dy += self.vel_y
-        for tile in world.tile_list:
-            temp_rect_x = self.rect.copy()
-            temp_rect_x.x += dx
-            if tile[1].colliderect(temp_rect_x):
-                dx = 0
-            temp_rect_y = self.rect.copy()
-            temp_rect_y.y += dy
-            if tile[1].colliderect(temp_rect_y):
-                if self.vel_y < 0:
-                    dy = tile[1].bottom - self.rect.top
-                    self.vel_y = 0
-                elif self.vel_y >= 0:
-                    dy = tile[1].top - self.rect.bottom
-                    self.vel_y = 0
-        self.rect.x += dx
-        self.rect.y += dy
-        self.animation_counter += 1
-        if self.animation_counter > self.animation_cooldown:
-            self.animation_counter = 0
-            self.index += 1
-            if self.index >= len(self.images):
-                self.index = 0
-            self.image = self.images[self.index]
+        if self.alive:
+            dx = 0
+            dy = 0
+            if player_rect.x < self.rect.x:
+                dx = -self.move_speed
+            elif player_rect.x > self.rect.x:
+                dx = self.move_speed
+            self.vel_y += 1
+            if self.vel_y > 10:
+                self.vel_y = 10
+            dy += self.vel_y
+            temp_rect_x_for_goomba_check = self.rect.copy()
+            temp_rect_x_for_goomba_check.x += dx
+            temp_rect_y_for_goomba_check = self.rect.copy()
+            temp_rect_y_for_goomba_check.y += dy
+            global goomba_group
+            for other_goomba in goomba_group:
+                if other_goomba != self and other_goomba.alive:
+                    if temp_rect_x_for_goomba_check.colliderect(other_goomba.rect):
+                        dx = 0
+                    if temp_rect_y_for_goomba_check.colliderect(other_goomba.rect):
+                        dy = 0
+                        self.vel_y = 0
+            for tile in world.tile_list:
+                temp_rect_x = self.rect.copy()
+                temp_rect_x.x += dx
+                if tile[1].colliderect(temp_rect_x):
+                    dx = 0
+                temp_rect_y = self.rect.copy()
+                temp_rect_y.y += dy
+                if tile[1].colliderect(temp_rect_y):
+                    if self.vel_y < 0:
+                        dy = tile[1].bottom - self.rect.top
+                        self.vel_y = 0
+                    elif self.vel_y >= 0:
+                        dy = tile[1].top - self.rect.bottom
+                        self.vel_y = 0
+            self.rect.x += dx
+            self.rect.y += dy
+            self.animation_counter += 1
+            if self.animation_counter > self.animation_cooldown:
+                self.animation_counter = 0
+                self.index += 1
+                if self.index >= len(self.images):
+                    self.index = 0
+                self.image = self.images[self.index]
+        else:
+            self.image = self.dead_image
+            self.rect.y += 2
+            self.dead_animation_counter += 1
+            if self.dead_animation_counter >= self.dead_animation_duration:
+                self.kill()
 
 class Lava(pygame.sprite.Sprite):
     def __init__(self, x, y):
@@ -249,53 +360,101 @@ class Lava(pygame.sprite.Sprite):
         self.rect.x = x
         self.rect.y = y
 
+class Exit(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        pygame.sprite.Sprite.__init__(self)
+        img = pygame.image.load('exit.png')
+        self.image = pygame.transform.scale(img, (tile_size, int(tile_size * 1.5)))
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+
+
+player = Player(100, screen_height - 130)
+
+goomba_group = pygame.sprite.Group()
+lava_group = pygame.sprite.Group()
+exit_group = pygame.sprite.Group()
+
 world_data = [
 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 7, 7, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-[1, 7, 7, 7, 7, 7, 7, 0, 5, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 1],
 [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 8, 7, 0, 0, 0, 0, 0, 0, 1],
-[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2, 2, 2, 2, 1],
-[1, 0, 0, 0, 0, 0, 3, 2, 2, 6, 6, 6, 6, 6, 1, 1, 1, 1, 1, 1],
-[1, 0, 0, 0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-[1, 0, 0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-[1, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 1],
+[1, 0, 0, 0, 0, 0, 2, 0, 0, 2, 0, 0, 2, 0, 0, 0, 0, 2, 2, 1],
+[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 1, 1, 1],
+[1, 0, 0, 0, 2, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 1, 1, 1, 1],
+[1, 0, 0, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+[1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 ]
-
-player = Player(100, screen_height - 130)
-goomba_group = pygame.sprite.Group()
-lava_group = pygame.sprite.Group()
+ 
+#load in level data and create world
+if path.exists(f'level{level}_data'):
+    pickle_in = open(f'level{level}_data', 'rb')
+    world_data = pickle.load(pickle_in)
 world = World(world_data)
+
 restart_button = Button(screen_width // 2 - 50, screen_height // 2 + 100, restart_img)
+start_button = Button(screen_width // 2 - 350, screen_height // 2, start_img)
+exit_button = Button(screen_width // 2 + 150, screen_height // 2, exit_img)
 
 run = True
 while run:
     clock.tick(fps)
     screen.blit(bg_img, (0, 0))
     screen.blit(sun_img, (100, 100))
-    world.draw()
-    if game_over == 0:
-        goomba_group.update(world, player.rect)
-    goomba_group.draw(screen)
-    lava_group.draw(screen)
-    game_over = player.update(game_over)
-    if game_over == -1:
-        if restart_button.draw():
-            player.reset(100, screen_height - 130)
-            game_over = 0
+    if main_menu == True:
+        if exit_button.draw():
+            run = False
+        if start_button.draw():
+            main_menu = False
+    else:
+        world.draw()
+        if game_over == 0:
+            goomba_group.update(world, player.rect)
+        goomba_group.draw(screen)
+        lava_group.draw(screen)
+        exit_group.draw(screen)
+        game_over = player.update(game_over)
+        
+        if game_over == -1:
+            if restart_button.draw():
+                world_data = []
+                world = reset_level(level)
+                goomba_group.empty()
+                lava_group.empty()
+                world = World(world_data)
+                game_over = 0
+
+        if game_over == 1:
+            #reset game and go to next level
+            level += 1
+            if level <= max_levels:
+                #reset level
+                world_data = []
+                world = reset_level(level)
+                game_over = 0
+            else:
+                if restart_button.draw():
+                    level = 1
+                    #reset level
+                    world_data = []
+                    world = reset_level(level)
+                    game_over = 0
+                
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
     pygame.display.update()
-
 pygame.quit()
